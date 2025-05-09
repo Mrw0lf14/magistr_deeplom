@@ -1,57 +1,95 @@
-#include <Wire.h>
-#include <WiFi.h>
-#include <WebServer.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
+#include "main.h"
 
-// Настройки дисплея SSD1306
-#define SCREEN_WIDTH 128
-#define SCREEN_HEIGHT 64
-#define OLED_RESET -1
-#define SCREEN_ADDRESS 0x3C
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
-const uint8_t charge_bmp [] PROGMEM = {
-0x06, 0x0A, 0x12, 0x24, 0x44, 0x88, 0xEE, 0x22, 0x44, 0x48, 0x90, 0xA0, 0xC0, 0x00, 0x00, 0x00
-};
-  
-const uint8_t bat_body_bpm [] PROGMEM = {
-0x3F, 0xFF, 0xFE, 0x40, 0x00, 0x01, 0x40, 0x00, 0x01, 0x40, 0x00, 0x01, 0xC0, 0x00, 0x01, 0xC0,
-0x00, 0x01, 0xC0, 0x00, 0x01, 0xC0, 0x00, 0x01, 0x40, 0x00, 0x01, 0x40, 0x00, 0x01, 0x40, 0x00,
-0x01, 0x40, 0x00, 0x01, 0x3F, 0xFF, 0xFE, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
-};
+AsyncWebServer server(80);
 
-const uint8_t bat_cell_bpm [] PROGMEM = {
-  0x00, 0x00, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0x00, 0x00, 0x00, 0x00, 0x00
-};
+const char* ssid = "Odeyalo";     // Замените на имя вашей WiFi сети
+const char* password = "20012005"; // Замените на пароль
+
+void listFiles() {
+  Serial.println("\nLittleFS File List:");
+  File root = LittleFS.open("/");
+  File file = root.openNextFile();
+  
+  while(file) {
+    Serial.printf("File: %s, Size: %d\n", file.name(), file.size());
+    file = root.openNextFile();
+  }
+}
 
 void setup() {
-  // put your setup code here, to run once:
   Serial.begin(115200);
-  pinMode(5, INPUT);
+  pinMode(PIN_CHARGE, INPUT);
+
   // Инициализация дисплея
-  Wire.begin(17, 18); // Настройка I2C
-  display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS);
+  Wire.begin(PIN_SDA, PIN_SCL);
+  if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
+    Serial.println(F("SSD1306 allocation failed"));
+    for(;;);
+  }
   display.clearDisplay();
-  display.setTextColor(WHITE);
-  display.println(F("init"));
+  display.setTextColor(SSD1306_WHITE);
+  display.println(F("Initializing..."));
+  display.display();
+
+  // Инициализация LittleFS
+  if(!LittleFS.begin()){
+    Serial.println("LittleFS Mount Failed");
+    display.println("FS Error");
+    display.display();
+    return;
+  }
+
+  // Запуск WiFi
+  WiFi.begin(ssid, password);
+  Serial.print("Подключение к WiFi");
+  
+  // Подключение к WiFi
+  WiFi.begin(ssid, password);
+  Serial.print("Подключение к WiFi");
+  
+  while(WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  
+  Serial.println("\nПодключено!");
+  Serial.print("IP адрес: ");
+  Serial.println(WiFi.localIP());
+
+  // Настройка маршрутов сервера
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(LittleFS, "/index.html", "text/html");
+  });
+
+  // Настройка веб-сервера
+  server.serveStatic("/", LittleFS, "/index.html");
+  server.serveStatic("/css/", LittleFS, "/css/");
+  server.serveStatic("/js/", LittleFS, "/js/");
+  listFiles();
+  server.begin();
+}
+
+void updateBatteryDisplay() {
+  uint16_t volt_bat = analogRead(PIN_VBAT);
+  uint8_t state_charge = digitalRead(PIN_CHARGE);
+  display.clearDisplay();
+  
+  // Очищаем только область батареи
+  display.fillRect(90, 0, 40, 16, SSD1306_BLACK);
+  
+  // Рисуем иконки
+  display.drawBitmap(90, 0, charge_bmp, 8, 16, (state_charge == 1));
+  display.drawBitmap(100, 0, bat_body_bpm, 24, 16, SSD1306_WHITE);
+  display.drawBitmap(103, 0, bat_cell_bpm, 8, 16, (volt_bat > 3000));
+  display.drawBitmap(108, 0, bat_cell_bpm, 8, 16, (volt_bat > 3100));
+  display.drawBitmap(113, 0, bat_cell_bpm, 8, 16, (volt_bat > 3200));
+  display.drawBitmap(118, 0, bat_cell_bpm, 8, 16, (volt_bat > 3300));
   display.display();
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-  uint16_t volt_bat = analogRead(4);
-  uint8_t state_charge = digitalRead(5);
-  Serial.println(volt_bat);
-  uint8_t x = 90;
-  uint8_t y = 0;
-  display.drawBitmap(x, y, charge_bmp, 8, 16, (state_charge == 0));
-
-  display.drawBitmap(x + 10, y, bat_body_bpm, 24, 16, 1);
-  display.drawBitmap(x + 13, y, bat_cell_bpm, 8, 16, (volt_bat > 3200));
-  display.drawBitmap(x + 18, y, bat_cell_bpm, 8, 16, (volt_bat > 3500));
-  display.drawBitmap(x + 23, y, bat_cell_bpm, 8, 16, (volt_bat > 3800));
-  display.drawBitmap(x + 28, y, bat_cell_bpm, 8, 16, (volt_bat > 4000));
-  display.display();
-  delay(100);
-} 
+  updateBatteryDisplay();
+  delay(1000); // Обновляем раз в секунду
+}

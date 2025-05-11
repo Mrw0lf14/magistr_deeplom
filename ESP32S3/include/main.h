@@ -8,6 +8,7 @@
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+#include <ArduinoJson.h>
 
 #define PIN_VBAT        4
 #define PIN_CHARGE      5

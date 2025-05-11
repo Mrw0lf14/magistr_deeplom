@@ -9,6 +9,12 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <ArduinoJson.h>
+#include "FS.h"
+#include "SD.h"
+#include "SPI.h"
+#include "SdFat.h"
+#include "USB.h"
+#include "USBMSC.h"
 
 #define PIN_VBAT        4
 #define PIN_CHARGE      5
@@ -20,6 +26,12 @@
 #define SCREEN_HEIGHT   64
 #define OLED_RESET      -1
 #define SCREEN_ADDRESS  0x3C
+
+// Настройка пинов для SPI
+#define CS_PIN 10
+#define SCK_PIN 12
+#define MISO_PIN 13
+#define MOSI_PIN 11
 
 const uint8_t charge_bmp [] PROGMEM = {
 0x06, 0x0A, 0x12, 0x24, 0x44, 0x88, 0xEE, 0x22, 0x44, 0x48, 0x90, 0xA0, 0xC0, 0x00, 0x00, 0x00
@@ -34,3 +46,11 @@ const uint8_t bat_body_bpm [] PROGMEM = {
 const uint8_t bat_cell_bpm [] PROGMEM = {
     0x00, 0x00, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0x00, 0x00, 0x00, 0x00, 0x00
 };
+
+// Настройки USB MSC
+SdFat sd;
+USBMSC MSC;
+static const uint16_t DISK_SECTOR_SIZE = 512;
+static uint32_t sectors = 0;
+uint16_t batteryLevel;
+bool isCharging;

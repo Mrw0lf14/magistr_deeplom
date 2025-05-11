@@ -1,0 +1,170 @@
+
+* {
+    box-sizing: border-box;
+    font-family: Arial, sans-serif;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    background-color: #f5f5f5;
+}
+
+.header {
+    background-color: #4CAF50;
+    color: white;
+    padding: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.header h1 {
+    margin: 0;
+    font-size: 1.5rem;
+}
+
+.status-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.battery {
+    display: flex;
+    align-items: center;
+}
+
+.battery-level {
+    margin-left: 0.5rem;
+}
+
+.charging {
+    color: #FFD700;
+    margin-left: 0.5rem;
+}
+
+.container {
+    padding: 1rem;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.breadcrumb {
+    padding: 0.5rem 1rem;
+    background-color: #e0e0e0;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+}
+
+.file-table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: white;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.file-table th, .file-table td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+.file-table th {
+    background-color: #f2f2f2;
+    position: sticky;
+    top: 0;
+}
+
+.file-table tr:hover {
+    background-color: #f5f5f5;
+}
+
+.file-icon {
+    margin-right: 0.5rem;
+    width: 20px;
+    text-align: center;
+}
+
+.file-name {
+    display: flex;
+    align-items: center;
+}
+
+.dir-link {
+    color: #2196F3;
+    text-decoration: none;
+}
+
+.dir-link:hover {
+    text-decoration: underline;
+}
+
+.download-btn {
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+}
+
+.download-btn:hover {
+    background-color: #45a049;
+}
+
+.nav-menu {
+    display: flex;
+    gap: 1rem;
+}
+
+.nav-link {
+    color: white;
+    text-decoration: none;
+    padding: 0.5rem;
+    border-radius: 4px;
+}
+
+.nav-link:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.logout-btn {
+    background-color: #f44336;
+}
+
+.logout-btn:hover {
+    background-color: #d32f2f;
+}
+
+@media (max-width: 768px) {
+    .file-table {
+        font-size: 0.9rem;
+    }
+    .file-table th, .file-table td {
+        padding: 0.5rem;
+    }
+    .header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .status-info {
+        width: 100%;
+        justify-content: space-between;
+    }
+}
+
+@media (max-width: 480px) {
+    .file-table {
+        display: block;
+        overflow-x: auto;
+    }
+    .download-btn {
+        padding: 0.3rem 0.6rem;
+        font-size: 0.8rem;
+    }
+}

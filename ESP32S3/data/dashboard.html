@@ -1,14 +1,48 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ESP32-S3 Control Panel</title>
-    <link rel="stylesheet" href="/css/style.css">
+    <title>ESP32S3 File Server - Файлы</title>
+    <link rel="stylesheet" href="/css/style_dashboard.css">
 </head>
 <body>
-    <h2>Авторизация завершена</h2>
+    <div class="header">
+        <h1>Файловый менеджер</h1>
+        <div class="nav-menu">
+            <a href="/files" class="nav-link">Файлы</a>
+            <a href="/settings" class="nav-link">Настройки</a>
+            <a href="/logout" class="nav-link logout-btn">Выйти</a>
+        </div>
+        <div class="status-info">
+            <div class="battery">
+                <span>🔋</span>
+                <span class="battery-level" id="battery-level">--%</span>
+                <span class="charging" id="charging-status"></span>
+            </div>
+        </div>
+    </div>
 
-    <script src="/js/script.js"></script>
+    <div class="container">
+        <div class="breadcrumb" id="breadcrumb">
+            <a href="/files" class="dir-link">Корневая папка</a>
+        </div>
+
+        <table class="file-table">
+            <thead>
+                <tr>
+                    <th>Имя</th>
+                    <th>Размер</th>
+                    <th>Дата изменения</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody id="file-list">
+                <!-- Файлы будут загружены через JavaScript -->
+            </tbody>
+        </table>
+    </div>
+
+    <script src="/js/script_dashboard.js"></script>
 </body>
 </html>

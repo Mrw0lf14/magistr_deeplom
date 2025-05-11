@@ -10,6 +10,32 @@ const char* auth_password = "admin123";
 const char* ssid = "Odeyalo";     // Замените на имя вашей WiFi сети
 const char* password = "20012005"; // Замените на пароль
 
+// Глобальные счетчики
+static uint32_t readCounter = 0, writeCounter = 0, busyCounter = 0;
+
+// Callbacks для USB MSC
+static int32_t onWrite(uint32_t lba, uint32_t offset, uint8_t *buffer, uint32_t bufsize) {
+  if (sd.card()->isBusy()) busyCounter++;
+  while (sd.card()->isBusy());
+  return sd.card()->writeSectors(lba, buffer, bufsize / DISK_SECTOR_SIZE) ? bufsize : -1;
+}
+
+static int32_t onRead(uint32_t lba, uint32_t offset, void *buffer, uint32_t bufsize) {
+  if (sd.card()->isBusy()) busyCounter++;
+  while (sd.card()->isBusy());
+  return sd.card()->readSectors(lba, (uint8_t *)buffer, bufsize / DISK_SECTOR_SIZE) ? bufsize : -1;
+}
+
+static bool onStartStop(uint8_t power_condition, bool start, bool load_eject) {
+  return true;
+}
+
+// Обработчики WebServer
+void handleRoot();
+void handleFileUpload();
+void handleFileList();
+void handleFileRead();
+
 // Middleware для проверки авторизации
 bool checkAuth(AsyncWebServerRequest *request) {
   if(!request->authenticate(auth_username, auth_password)) {
@@ -127,14 +153,115 @@ void setup() {
     if(request->_tempObject){
         memcpy((uint8_t*)request->_tempObject + index, data, len);
     }
+  });
+  server.on("/dashboard.html", HTTP_GET, [](AsyncWebServerRequest *request){
+    // if(checkAuth(request)) {
+    request->send(LittleFS, "/dashboard.html", "text/html");
+    // }
+  });
+
+  // Обработчик для API батареи
+  server.on("/api/battery", HTTP_GET, [](AsyncWebServerRequest *request){
+    // if(!checkAuth(request)) return;
+    Serial.println("charge response");
+    DynamicJsonDocument doc(64);
+    doc["level"] = batteryLevel;
+    doc["charging"] = isCharging;
+    Serial.println(batteryLevel);
+    String json;
+    serializeJson(doc, json);
+    
+    request->send(200, "application/json", json);
+  });
+
+  // Обработчик для списка файлов с SD карты
+server.on("/api/files", HTTP_GET, [](AsyncWebServerRequest *request){
+    Serial.println("Запрос списка файлов с SD карты");
+    
+    // Всегда работаем с корневой директорией
+    String path = "/";
+
+    // Открываем корневую директорию на SD карте
+    File root = SD.open(path);
+    if(!root || !root.isDirectory()){
+        Serial.println("Ошибка открытия корневой директории SD карты");
+        request->send(500, "application/json", "{\"error\":\"Failed to open SD card\"}");
+        return;
+    }
+
+    // Создаем JSON ответ
+    DynamicJsonDocument doc(4096); // Достаточный размер для списка файлов
+    JsonArray files = doc.createNestedArray("files");
+
+    // Перечисляем все файлы и папки
+    File file = root.openNextFile();
+    while(file){
+        JsonObject fileInfo = files.createNestedObject();
+        String fileName = file.name();
+        
+        // Убираем ведущий слеш если есть
+        if(fileName.startsWith("/")) {
+            fileName = fileName.substring(1);
+        }
+
+        fileInfo["name"] = fileName;
+        fileInfo["isDir"] = file.isDirectory();
+        
+        if(!file.isDirectory()) {
+            fileInfo["size"] = file.size();
+        }
+        
+        // Время модификации
+        time_t lastWrite = file.getLastWrite();
+        if(lastWrite > 0){
+            char timeStr[20];
+            strftime(timeStr, sizeof(timeStr), "%Y-%m-%d %H:%M:%S", localtime(&lastWrite));
+            fileInfo["modified"] = timeStr;
+        }
+        
+        fileInfo["fullPath"] = fileName;
+        file = root.openNextFile();
+    }
+    root.close();
+
+    String json;
+    serializeJson(doc, json);
+    request->send(200, "application/json", json);
 });
 
   // Настройка веб-сервера
   server.serveStatic("/", LittleFS, "/");
-  server.serveStatic("/css/", LittleFS, "/css/");
+  server.serveStatic("/css/style.css", LittleFS, "/css/style.css", "text/css");
   server.serveStatic("/js/", LittleFS, "/js/");
   listFiles();
   server.begin();
+
+  // Инициализация SD
+  pinMode(CS_PIN, OUTPUT);
+  digitalWrite(CS_PIN, HIGH);
+  SPI.begin(SCK_PIN, MISO_PIN, MOSI_PIN);
+  // if (!sd.begin(CS_PIN)) {
+  //   Serial.println("SD-карта не найдена!");
+  //   display.println(F("ERROR SD"));
+  //   display.display();
+  //   while (true);
+  // }
+  // sectors = sd.card()->sectorCount();
+  // Serial.printf("SD sectors: %d\n", sectors);
+  if (!SD.begin(CS_PIN)) {
+        Serial.println("Ошибка инициализации SD карты");
+        display.println("SD Card Error");
+        display.display();
+        return;
+    }
+    Serial.println("SD карта инициализирована");
+  // // Инициализация USB MSC
+  // MSC.onStartStop(onStartStop);
+  // MSC.onRead(onRead);
+  // MSC.onWrite(onWrite);
+  // MSC.mediaPresent(true);
+  // MSC.begin(sectors, DISK_SECTOR_SIZE);
+  // USB.begin();
 }
 
 void updateBatteryDisplay() {
@@ -142,10 +269,14 @@ void updateBatteryDisplay() {
   uint8_t state_charge = digitalRead(PIN_CHARGE);
   display.clearDisplay();
   
+  batteryLevel = (volt_bat - 3000) * 100 / 450;
+  batteryLevel = batteryLevel > 100? 100: batteryLevel;
+  isCharging = state_charge == 1 ? true : false;
   // Очищаем только область батареи
   display.fillRect(90, 0, 40, 16, SSD1306_BLACK);
   
   // Рисуем иконки
+  // Serial.println(volt_bat);
   display.drawBitmap(90, 0, charge_bmp, 8, 16, (state_charge == 1));
   display.drawBitmap(100, 0, bat_body_bpm, 24, 16, SSD1306_WHITE);
   display.drawBitmap(103, 0, bat_cell_bpm, 8, 16, (volt_bat > 3000));

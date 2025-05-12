@@ -54,3 +54,4 @@ static const uint16_t DISK_SECTOR_SIZE = 512;
 static uint32_t sectors = 0;
 uint16_t batteryLevel;
 bool isCharging;
+volatile bool isDownloading = false; // Флаг скачивания

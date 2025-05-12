@@ -56,6 +56,7 @@ void listFiles() {
   }
 }
 
+
 void setup() {
   Serial.begin(115200);
   pinMode(PIN_CHARGE, INPUT);
@@ -177,7 +178,8 @@ void setup() {
   // Обработчик для списка файлов с SD карты
 server.on("/api/files", HTTP_GET, [](AsyncWebServerRequest *request){
     Serial.println("Запрос списка файлов с SD карты");
-    
+    if (isDownloading)
+      return;
     // Всегда работаем с корневой директорией
     String path = "/";
 
@@ -228,7 +230,63 @@ server.on("/api/files", HTTP_GET, [](AsyncWebServerRequest *request){
     serializeJson(doc, json);
     request->send(200, "application/json", json);
 });
+  // Обработчик для скачивания файлов с SD карты
+server.on("/download", HTTP_GET, [](AsyncWebServerRequest *request) {
+    // Проверка параметра path
+    isDownloading = true;
+    if (!request->hasParam("path")) {
+        request->send(400, "text/plain", "Missing 'path' parameter");
+        return;
+    }
 
+    String path = "/" + request->getParam("path")->value();
+    Serial.printf("Запрос на скачивание файла: %s\n", path.c_str());
+
+    // Проверка существования файла
+    if (!SD.exists(path)) {
+        Serial.println("Файл не найден: " + path);
+        request->send(404, "text/plain", "File not found");
+        return;
+    }
+
+    // Открываем файл заранее, чтобы проверить доступ
+    File file = SD.open(path, FILE_READ);
+    if (!file) {
+        Serial.println("Ошибка открытия файла: " + path);
+        request->send(500, "text/plain", "Failed to open file");
+        return;
+    }
+
+    // Получаем имя файла для заголовка
+    String filename = path.substring(path.lastIndexOf('/') + 1);
+    Serial.println("Скачивание файла: " + filename + ", размер: " + file.size() + " байт");
+
+    // Создаем потоковый ответ с лямбдой для чтения файла
+    AsyncWebServerResponse *response = request->beginChunkedResponse(
+        "application/octet-stream",
+        [file, path](uint8_t *buffer, size_t maxLen, size_t index) mutable -> size_t {
+            // Читаем данные из файла
+            size_t bytesRead = file.read(buffer, maxLen);
+            Serial.print(".");
+            // Если достигнут конец файла или ошибка чтения
+            if (bytesRead == 0) {
+                file.close();
+                Serial.println("Файл успешно отправлен, закрываем: " + path);
+            }
+            
+            return bytesRead;
+        }
+    );
+
+    // Устанавливаем заголовок Content-Disposition
+    response->addHeader("Content-Disposition", "attachment; filename=\"" + filename + "\"");
+    
+    // Отправляем ответ
+    request->send(response);
+    // Принудительно закрываем файл, если что-то пошло не так
+    file.close();
+    isDownloading = false;
+});
   // Настройка веб-сервера
   server.serveStatic("/", LittleFS, "/");
   server.serveStatic("/css/style.css", LittleFS, "/css/style.css", "text/css");

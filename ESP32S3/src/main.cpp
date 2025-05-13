@@ -335,7 +335,38 @@ server.on("/upload", HTTP_POST,
     }
   }
 );
+// Добавим в setup() новые маршруты:
+server.on("/api/settings", HTTP_GET, [](AsyncWebServerRequest *request) {
+    // if(!checkAuth(request)) return;
+    
+    DynamicJsonDocument doc(1024);
+    
+    // WiFi settings
+    doc["wifi"]["mode"] = WiFi.getMode() == WIFI_STA ? "station" : "ap";
+    doc["wifi"]["ssid"] = WiFi.SSID();
+    doc["wifi"]["password"] = "********"; // Не возвращаем реальный пароль
+    
+    // AP settings
+    doc["ap"]["ssid"] = "ESP32-AP"; // Ваше имя AP
+    doc["ap"]["password"] = "********"; // Не возвращаем реальный пароль
+    
+    // USB settings
+    // doc["usb"]["enabled"] = MSC.mediaPresent();
+    
+    // Ports settings (пример)
+    // doc["ports"]["port1"] = digitalRead(PIN_EXT_PORT1) == HIGH;
+    // doc["ports"]["port2"] = digitalRead(PIN_EXT_PORT2) == HIGH;
+    
+    String json;
+    serializeJson(doc, json);
+    request->send(200, "application/json", json);
+});
 
+  server.on("/settings.html", HTTP_GET, [](AsyncWebServerRequest *request){
+    // if(checkAuth(request)) {
+    request->send(LittleFS, "/settings.html", "text/html");
+    // }
+  });
   // Настройка веб-сервера
   server.serveStatic("/", LittleFS, "/");
   server.serveStatic("/css/style.css", LittleFS, "/css/style.css", "text/css");

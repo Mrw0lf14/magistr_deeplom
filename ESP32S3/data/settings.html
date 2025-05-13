@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32S3 File Server - Настройки</title>
+    <link rel="stylesheet" href="/css/style_settings.css">
+    <link rel="stylesheet" href="/css/style_dashboard.css">
+</head>
+<body>
+    <div class="header">
+        <h1>Настройки системы</h1>
+        <div class="nav-menu">
+            <a href="/dashboard.html" class="nav-link">Файлы</a>
+            <a href="/settings.html" class="nav-link active">Настройки</a>
+            <a href="/logout" class="nav-link logout-btn">Выйти</a>
+        </div>
+        <div class="status-info">
+            <div class="battery">
+                <span>🔋</span>
+                <span class="battery-level" id="battery-level">--%</span>
+                <span class="charging" id="charging-status"></span>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="settings-section">
+            <h2>Настройки WiFi</h2>
+            <form id="wifi-settings-form">
+                <div class="form-group">
+                    <label for="wifi-mode">Режим WiFi:</label>
+                    <select id="wifi-mode" name="wifi-mode" class="form-control">
+                        <option value="station">Подключение к сети</option>
+                        <option value="ap">Точка доступа</option>
+                    </select>
+                </div>
+
+                <div id="station-settings">
+                    <div class="form-group">
+                        <label for="wifi-ssid">Имя сети (SSID):</label>
+                        <input type="text" id="wifi-ssid" name="wifi-ssid" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="wifi-password">Пароль:</label>
+                        <input type="password" id="wifi-password" name="wifi-password" class="form-control">
+                    </div>
+                    <button type="button" id="scan-wifi" class="btn-secondary">Сканировать сети</button>
+                    <div id="wifi-networks" class="wifi-networks-list"></div>
+                </div>
+
+                <div id="ap-settings" style="display: none;">
+                    <div class="form-group">
+                        <label for="ap-ssid">Имя точки доступа:</label>
+                        <input type="text" id="ap-ssid" name="ap-ssid" class="form-control" value="ESP32-AP">
+                    </div>
+                    <div class="form-group">
+                        <label for="ap-password">Пароль точки доступа:</label>
+                        <input type="password" id="ap-password" name="ap-password" class="form-control" minlength="8">
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-primary">Сохранить WiFi настройки</button>
+            </form>
+        </div>
+
+        <div class="settings-section">
+            <h2>Настройки USB</h2>
+            <form id="usb-settings-form">
+                <div class="form-group checkbox-group">
+                    <input type="checkbox" id="usb-enabled" name="usb-enabled">
+                    <label for="usb-enabled">Включить USB Mass Storage</label>
+                </div>
+                <button type="submit" class="btn-primary">Сохранить USB настройки</button>
+            </form>
+        </div>
+
+        <div class="settings-section">
+            <h2>Настройки внешних портов</h2>
+            <form id="ports-settings-form">
+                <div class="form-group checkbox-group">
+                    <input type="checkbox" id="ext-port1-enabled" name="ext-port1-enabled">
+                    <label for="ext-port1-enabled">Включить внешний порт 1</label>
+                </div>
+                <div class="form-group checkbox-group">
+                    <input type="checkbox" id="ext-port2-enabled" name="ext-port2-enabled">
+                    <label for="ext-port2-enabled">Включить внешний порт 2</label>
+                </div>
+                <button type="submit" class="btn-primary">Сохранить настройки портов</button>
+            </form>
+        </div>
+
+        <div class="settings-section">
+            <h2>Системные настройки</h2>
+            <button id="reboot-btn" class="btn-warning">Перезагрузить устройство</button>
+            <button id="reset-btn" class="btn-danger">Сбросить настройки</button>
+        </div>
+    </div>
+
+    <script src="/js/script_settings.js"></script>
+    <script src="/js/script_dashboard.js"></script>
+</body>
+</html>

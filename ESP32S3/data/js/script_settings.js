@@ -120,7 +120,6 @@ function savePortsSettings(e) {
     
     const settings = {
         port1: document.getElementById('ext-port1-enabled').checked,
-        port2: document.getElementById('ext-port2-enabled').checked
     };
     
     saveSettings('ports', settings)

@@ -183,6 +183,8 @@ void setup() {
     return;
   }
 
+  Serial.printf("Free space: %d bytes\n", LittleFS.totalBytes() - LittleFS.usedBytes());
+  
   // В функции setup() после инициализации LittleFS добавьте:
   if (!loadSettings()) {
     Serial.println("Используются настройки по умолчанию");
@@ -472,7 +474,7 @@ server.on("/api/settings", HTTP_GET, [](AsyncWebServerRequest *request) {
 server.on("/api/settings/wifi", HTTP_POST, [](AsyncWebServerRequest *request) {
   // if(!checkAuth(request)) return;
   
-  if(request->_tempObject == nullptr) {
+  if(!request->_tempObject){
     request->send(400, "text/plain", "Bad Request");
     return;
   }
@@ -492,6 +494,7 @@ server.on("/api/settings/wifi", HTTP_POST, [](AsyncWebServerRequest *request) {
   
   // Сохраняем настройки
   if (saveSettings()) {
+    Serial.println("Настройки сохранены");
     request->send(200, "text/plain", "OK");
   } else {
     request->send(500, "text/plain", "Failed to save settings");
@@ -510,10 +513,11 @@ server.on("/api/settings/wifi", HTTP_POST, [](AsyncWebServerRequest *request) {
 server.on("/api/settings/usb", HTTP_POST, [](AsyncWebServerRequest *request) {
   // if(!checkAuth(request)) return;
   
-  if(request->_tempObject == nullptr) {
-    request->send(400, "text/plain", "Bad Request");
-    return;
-  }
+  Serial.println("Запрос на сохранение настроек USB");
+  // if(!request->_tempObject){
+  //   request->send(400, "text/plain", "Bad Request");
+  //   return;
+  // }
   
   String body = String((char*)request->_tempObject);
   DynamicJsonDocument doc(128);
@@ -523,6 +527,7 @@ server.on("/api/settings/usb", HTTP_POST, [](AsyncWebServerRequest *request) {
   
   if (saveSettings()) {
     request->send(200, "text/plain", "OK");
+    Serial.println("Настройки сохранены");
   } else {
     request->send(500, "text/plain", "Failed to save settings");
   }
@@ -534,17 +539,16 @@ server.on("/api/settings/usb", HTTP_POST, [](AsyncWebServerRequest *request) {
 server.on("/api/settings/ports", HTTP_POST, [](AsyncWebServerRequest *request) {
   // if(!checkAuth(request)) return;
   
-  if(request->_tempObject == nullptr) {
-    request->send(400, "text/plain", "Bad Request");
-    return;
-  }
+  // if(request->_tempObject == nullptr) {
+  //   request->send(400, "text/plain", "Bad Request");
+  //   return;
+  // }
   
   String body = String((char*)request->_tempObject);
   DynamicJsonDocument doc(128);
   deserializeJson(doc, body);
   
   systemSettings.ports.port1_enabled = doc["port1_enabled"];
-  systemSettings.ports.port2_enabled = doc["port2_enabled"];
   
   if (saveSettings()) {
     request->send(200, "text/plain", "OK");
@@ -598,6 +602,14 @@ server.on("/api/wifi/scan", HTTP_GET, [](AsyncWebServerRequest *request) {
     // if(checkAuth(request)) {
     request->send(LittleFS, "/settings.html", "text/html");
     // }
+  });
+
+  // Обработчик выхода из системы
+  server.on("/logout", HTTP_GET, [](AsyncWebServerRequest *request) {
+      // Очищаем заголовки авторизации
+      request->send(401, "text/plain", "Logged out");
+      // Или перенаправляем на страницу входа
+      // request->redirect("/index.html");
   });
   // Настройка веб-сервера
   server.serveStatic("/", LittleFS, "/");

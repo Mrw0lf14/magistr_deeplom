@@ -73,7 +73,9 @@ function loadFiles() {
                             </td>
                             <td>${file.size ? formatFileSize(file.size) : '-'}</td>
                             <td>${file.modified || '-'}</td>
-                            <td><a href="/download?path=${encodeURIComponent(file.fullPath)}" class="download-btn">Скачать</a></td>
+                            <td><a href="/download?path=${encodeURIComponent(file.fullPath)}" class="download-btn">Скачать</a>
+                                <a href="/delete?path=${encodeURIComponent(file.fullPath)}" class="delete-btn">Удалить</a>
+                            </td>
                         `;
                     }
                     

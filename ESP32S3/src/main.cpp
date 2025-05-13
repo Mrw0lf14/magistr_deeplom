@@ -276,6 +276,31 @@ server.on("/download", HTTP_GET, [](AsyncWebServerRequest *request) {
     // Не закрываем file здесь! Он закроется в лямбде.
 });
 
+ // Обработчик для скачивания файлов с SD карты
+server.on("/delete", HTTP_GET, [](AsyncWebServerRequest *request) {
+    isDownloading = true;
+    if (!request->hasParam("path")) {
+        request->send(400, "text/plain", "Missing 'path' parameter");
+        isDownloading = false;
+        return;
+    }
+
+    String path = "/" + request->getParam("path")->value();
+    Serial.printf("Запрос на удаление: %s\n", path.c_str());
+
+    if (!SD.exists(path)) {
+        request->send(404, "text/plain", "File not found");
+        isDownloading = false;
+        return;
+    }
+    if (SD.remove(path)) {
+        request->send(200, "text/plain", "File deleted");
+    } else {
+        request->send(500, "text/plain", "Failed to delete file");
+    }
+    isDownloading = false;
+});
+
 // Обработчик для загрузки файлов на SD карту
 server.on("/upload", HTTP_POST, 
   [](AsyncWebServerRequest *request) {

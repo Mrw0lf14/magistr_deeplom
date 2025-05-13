@@ -77,13 +77,6 @@ body {
     color: #666;
 }
 
-.breadcrumb {
-    padding: 0.5rem 1rem;
-    background-color: #e0e0e0;
-    border-radius: 4px;
-    margin-bottom: 1rem;
-}
-
 .file-table {
     width: 100%;
     border-collapse: collapse;
@@ -116,11 +109,6 @@ body {
 .file-name {
     display: flex;
     align-items: center;
-}
-
-.dir-link {
-    color: #2196F3;
-    text-decoration: none;
 }
 
 .dir-link:hover {

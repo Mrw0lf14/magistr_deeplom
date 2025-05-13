@@ -56,32 +56,6 @@ void listFiles() {
   }
 }
 
-void handleFileUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
-    static File uploadFile;
-    
-    if (!index) {
-        Serial.printf("Начало загрузки: %s\n", filename.c_str());
-        String path = "/" + filename;
-        uploadFile = SD.open(path, FILE_WRITE);
-        if (!uploadFile) {
-            Serial.println("Ошибка открытия файла для записи");
-            return;
-        }
-    }
-
-    if (uploadFile && len) {
-        uploadFile.write(data, len);
-    }
-
-    if (final) {
-        if (uploadFile) {
-            uploadFile.close();
-            Serial.printf("Завершена загрузка: %s, размер: %d байт\n", filename.c_str(), index + len);
-        }
-        isDownloading = false;
-    }
-}
-
 void setup() {
   Serial.begin(115200);
   pinMode(PIN_CHARGE, INPUT);
@@ -303,10 +277,39 @@ server.on("/download", HTTP_GET, [](AsyncWebServerRequest *request) {
 });
 
 // Обработчик для загрузки файлов на SD карту
-server.on("/upload", HTTP_POST, [](AsyncWebServerRequest *request) {
-    isDownloading = true;
-    request->send(200);
-}, handleFileUpload);
+server.on("/upload", HTTP_POST, 
+  [](AsyncWebServerRequest *request) {
+    // Этот колбэк вызывается после завершения загрузки файла
+    request->send(200, "text/plain", "Файл загружен");
+    isDownloading = false;
+  }, 
+  [](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
+    static File uploadFile;
+
+    if (index == 0) {
+      // Начало загрузки
+      Serial.printf("Начало загрузки: %s\n", filename.c_str());
+      String path = "/" + filename;
+      uploadFile = SD.open(path, FILE_WRITE);
+      if (!uploadFile) {
+        Serial.println("Ошибка открытия файла для записи");
+        return;
+      }
+      isDownloading = true;
+    }
+
+    if (uploadFile && len > 0) {
+      uploadFile.write(data, len);
+    }
+
+    if (final) {
+      if (uploadFile) {
+        uploadFile.close();
+        Serial.printf("Завершена загрузка: %s, размер: %d байт\n", filename.c_str(), index + len);
+      }
+    }
+  }
+);
 
   // Настройка веб-сервера
   server.serveStatic("/", LittleFS, "/");

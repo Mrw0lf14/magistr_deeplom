@@ -94,6 +94,12 @@ function loadFiles() {
         });
 }
 
+// Добавьте в script_dashboard.js
+document.getElementById('file-input').addEventListener('change', function(e) {
+    const fileName = e.target.files[0] ? e.target.files[0].name : 'Выберите файл';
+    document.getElementById('file-input-label').textContent = fileName;
+});
+
 // Инициализация и периодическое обновление
 document.addEventListener('DOMContentLoaded', function() {
     // Первоначальная загрузка

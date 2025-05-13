@@ -103,4 +103,43 @@ document.addEventListener('DOMContentLoaded', function() {
     // Обновление статуса батареи
     updateBatteryStatus();
     setInterval(updateBatteryStatus, 60000);
+
+    // Обработка загрузки файлов
+    const uploadForm = document.getElementById('upload-form');
+    if (uploadForm) {
+        uploadForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const fileInput = document.getElementById('file-input');
+            const uploadStatus = document.getElementById('upload-status');
+            
+            if (!fileInput.files.length) {
+                uploadStatus.textContent = 'Выберите файл для загрузки';
+                return;
+            }
+            
+            const file = fileInput.files[0];
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            uploadStatus.textContent = 'Загрузка...';
+            
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (response.ok) {
+                    uploadStatus.textContent = 'Файл успешно загружен!';
+                    loadFiles(); // Обновляем список файлов
+                } else {
+                    uploadStatus.textContent = 'Ошибка загрузки файла';
+                }
+            })
+            .catch(error => {
+                console.error('Ошибка:', error);
+                uploadStatus.textContent = 'Ошибка загрузки файла';
+            });
+        });
+    }
 });

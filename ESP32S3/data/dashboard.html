@@ -27,7 +27,14 @@
         <div class="breadcrumb" id="breadcrumb">
             <a href="/files" class="dir-link">Корневая папка</a>
         </div>
-
+        <div class="upload-section">
+            <h2>Загрузить файл на SD карту</h2>
+            <form id="upload-form">
+                <input type="file" id="file-input" name="file">
+                <button type="submit" class="upload-btn">Загрузить</button>
+            </form>
+            <div id="upload-status"></div>
+        </div>
         <table class="file-table">
             <thead>
                 <tr>

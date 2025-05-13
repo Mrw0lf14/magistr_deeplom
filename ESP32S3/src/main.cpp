@@ -56,6 +56,31 @@ void listFiles() {
   }
 }
 
+void handleFileUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
+    static File uploadFile;
+    
+    if (!index) {
+        Serial.printf("Начало загрузки: %s\n", filename.c_str());
+        String path = "/" + filename;
+        uploadFile = SD.open(path, FILE_WRITE);
+        if (!uploadFile) {
+            Serial.println("Ошибка открытия файла для записи");
+            return;
+        }
+    }
+
+    if (uploadFile && len) {
+        uploadFile.write(data, len);
+    }
+
+    if (final) {
+        if (uploadFile) {
+            uploadFile.close();
+            Serial.printf("Завершена загрузка: %s, размер: %d байт\n", filename.c_str(), index + len);
+        }
+        isDownloading = false;
+    }
+}
 
 void setup() {
   Serial.begin(115200);
@@ -276,6 +301,13 @@ server.on("/download", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send(response);
     // Не закрываем file здесь! Он закроется в лямбде.
 });
+
+// Обработчик для загрузки файлов на SD карту
+server.on("/upload", HTTP_POST, [](AsyncWebServerRequest *request) {
+    isDownloading = true;
+    request->send(200);
+}, handleFileUpload);
+
   // Настройка веб-сервера
   server.serveStatic("/", LittleFS, "/");
   server.serveStatic("/css/style.css", LittleFS, "/css/style.css", "text/css");

@@ -52,6 +52,31 @@ body {
     margin: 0 auto;
 }
 
+.upload-section {
+    margin-bottom: 20px;
+    padding: 15px;
+    background-color: #f5f5f5;
+    border-radius: 5px;
+}
+
+.upload-btn {
+    background-color: #4CAF50;
+    color: white;
+    padding: 8px 15px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.upload-btn:hover {
+    background-color: #45a049;
+}
+
+#upload-status {
+    margin-top: 10px;
+    color: #666;
+}
+
 .breadcrumb {
     padding: 0.5rem 1rem;
     background-color: #e0e0e0;

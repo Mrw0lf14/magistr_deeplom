@@ -16,6 +16,8 @@
 #include "USB.h"
 #include "USBMSC.h"
 
+#define min(X, Y) (((X) < (Y)) ? (X) : (Y))
+
 #define PIN_VBAT        4
 #define PIN_CHARGE      5
 

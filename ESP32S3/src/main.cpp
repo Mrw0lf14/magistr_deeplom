@@ -7,8 +7,8 @@ AsyncWebServer server(80);
 // Данные для авторизации
 const char* auth_username = "admin";
 const char* auth_password = "admin123";
-const char* ssid = "Odeyalo";     // Замените на имя вашей WiFi сети
-const char* password = "20012005"; // Замените на пароль
+const char* ssid = "applied_robotics";     // Замените на имя вашей WiFi сети
+const char* password = "listentome"; // Замените на пароль
 
 // Глобальные счетчики
 static uint32_t readCounter = 0, writeCounter = 0, busyCounter = 0;
@@ -232,60 +232,48 @@ server.on("/api/files", HTTP_GET, [](AsyncWebServerRequest *request){
 });
   // Обработчик для скачивания файлов с SD карты
 server.on("/download", HTTP_GET, [](AsyncWebServerRequest *request) {
-    // Проверка параметра path
     isDownloading = true;
     if (!request->hasParam("path")) {
         request->send(400, "text/plain", "Missing 'path' parameter");
+        isDownloading = false;
         return;
     }
 
     String path = "/" + request->getParam("path")->value();
-    Serial.printf("Запрос на скачивание файла: %s\n", path.c_str());
+    Serial.printf("Запрос на скачивание: %s\n", path.c_str());
 
-    // Проверка существования файла
     if (!SD.exists(path)) {
-        Serial.println("Файл не найден: " + path);
         request->send(404, "text/plain", "File not found");
+        isDownloading = false;
         return;
     }
 
-    // Открываем файл заранее, чтобы проверить доступ
-    File file = SD.open(path, FILE_READ);
-    if (!file) {
-        Serial.println("Ошибка открытия файла: " + path);
+    File *file = new File(SD.open(path, FILE_READ));
+    if (!*file) {
         request->send(500, "text/plain", "Failed to open file");
+        isDownloading = false;
         return;
     }
 
-    // Получаем имя файла для заголовка
     String filename = path.substring(path.lastIndexOf('/') + 1);
-    Serial.println("Скачивание файла: " + filename + ", размер: " + file.size() + " байт");
+    Serial.printf("Скачивание: %s (%d байт)\n", filename.c_str(), file->size());
 
-    // Создаем потоковый ответ с лямбдой для чтения файла
     AsyncWebServerResponse *response = request->beginChunkedResponse(
         "application/octet-stream",
-        [file, path](uint8_t *buffer, size_t maxLen, size_t index) mutable -> size_t {
-            // Читаем данные из файла
-            size_t bytesRead = file.read(buffer, maxLen);
-            Serial.print(".");
-            // Если достигнут конец файла или ошибка чтения
+        [file, path](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
+            size_t bytesRead = file->read(buffer, min(maxLen, 512)); // Читаем по 512 байт
             if (bytesRead == 0) {
-                file.close();
-                Serial.println("Файл успешно отправлен, закрываем: " + path);
+                file->close();
+                delete file;
+                Serial.println("Файл отправлен");
             }
-            
             return bytesRead;
         }
     );
 
-    // Устанавливаем заголовок Content-Disposition
     response->addHeader("Content-Disposition", "attachment; filename=\"" + filename + "\"");
-    
-    // Отправляем ответ
     request->send(response);
-    // Принудительно закрываем файл, если что-то пошло не так
-    file.close();
-    isDownloading = false;
+    // Не закрываем file здесь! Он закроется в лямбде.
 });
   // Настройка веб-сервера
   server.serveStatic("/", LittleFS, "/");

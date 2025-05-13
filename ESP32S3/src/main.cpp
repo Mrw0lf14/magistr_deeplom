@@ -10,8 +10,8 @@ SystemSettings systemSettings;
 // Данные для авторизации
 const char* auth_username = "admin";
 const char* auth_password = "admin123";
-const char* ssid = "applied_robotics";     // Замените на имя вашей WiFi сети
-const char* password = "listentome"; // Замените на пароль
+const char* ssid = "Odeyalo";     // Замените на имя вашей WiFi сети
+const char* password = "20012005"; // Замените на пароль
 
 // Глобальные счетчики
 static uint32_t readCounter = 0, writeCounter = 0, busyCounter = 0;
@@ -667,6 +667,12 @@ void updateBatteryDisplay() {
   
   // Рисуем иконки
   // Serial.println(volt_bat);
+  display.drawBitmap(0, 0, wifi_ap, 15, 16, 1);
+  display.drawBitmap(16, 0, wifi_sta_con, 19, 16, 1);
+  display.drawBitmap(36, 0, wifi_sta_discon, 19, 16, 1);
+  display.drawBitmap(55, 0, sd_on, 14, 16, 1);
+  display.drawBitmap(70, 0, sd_off, 14, 16, 1);
+  display.drawBitmap(70, 17, usb_on, 16, 16, 1);
   display.drawBitmap(90, 0, charge_bmp, 8, 16, (state_charge == 1));
   display.drawBitmap(100, 0, bat_body_bpm, 24, 16, SSD1306_WHITE);
   display.drawBitmap(103, 0, bat_cell_bpm, 8, 16, (volt_bat > 3000));

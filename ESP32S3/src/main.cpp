@@ -261,11 +261,12 @@ server.on("/download", HTTP_GET, [](AsyncWebServerRequest *request) {
     AsyncWebServerResponse *response = request->beginChunkedResponse(
         "application/octet-stream",
         [file, path](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
-            size_t bytesRead = file->read(buffer, min(maxLen, 512)); // Читаем по 512 байт
+            size_t bytesRead = file->read(buffer, min(maxLen, 2048));
             if (bytesRead == 0) {
                 file->close();
                 delete file;
                 Serial.println("Файл отправлен");
+                isDownloading = false;
             }
             return bytesRead;
         }
@@ -294,13 +295,21 @@ server.on("/download", HTTP_GET, [](AsyncWebServerRequest *request) {
   // }
   // sectors = sd.card()->sectorCount();
   // Serial.printf("SD sectors: %d\n", sectors);
-  if (!SD.begin(CS_PIN)) {
+  if (!SD.begin(CS_PIN, SPI, 40000000)) {
         Serial.println("Ошибка инициализации SD карты");
         display.println("SD Card Error");
         display.display();
         return;
     }
     Serial.println("SD карта инициализирована");
+    File testFile = SD.open("/speedtest.bin", FILE_WRITE);
+  uint8_t buf[512] = {0};
+  uint32_t start = millis();
+  for (int i = 0; i < 100; i++) {
+      testFile.write(buf, sizeof(buf));
+  }
+  testFile.close();
+  Serial.printf("SD write speed: %.2f KB/s\n", 50.0 / ((millis() - start) / 1000.0));
   // // Инициализация USB MSC
   // MSC.onStartStop(onStartStop);
   // MSC.onRead(onRead);
@@ -333,6 +342,9 @@ void updateBatteryDisplay() {
 }
 
 void loop() {
-  updateBatteryDisplay();
-  delay(1000); // Обновляем раз в секунду
+  static unsigned long lastCheck = 0;
+  if (millis() - lastCheck >= 10000) { // Раз в 10 секунд
+      updateBatteryDisplay();
+      lastCheck = millis();
+  }
 }

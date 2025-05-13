@@ -4,6 +4,9 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 AsyncWebServer server(80);
 
+// Глобальная переменная для хранения настроек
+SystemSettings systemSettings;
+
 // Данные для авторизации
 const char* auth_username = "admin";
 const char* auth_password = "admin123";
@@ -56,6 +59,107 @@ void listFiles() {
   }
 }
 
+String encryptionTypeToString(wifi_auth_mode_t encryptionType) {
+    switch(encryptionType) {
+        case WIFI_AUTH_OPEN: return "Open";
+        case WIFI_AUTH_WEP: return "WEP";
+        case WIFI_AUTH_WPA_PSK: return "WPA";
+        case WIFI_AUTH_WPA2_PSK: return "WPA2";
+        case WIFI_AUTH_WPA_WPA2_PSK: return "WPA/WPA2";
+        case WIFI_AUTH_WPA2_ENTERPRISE: return "WPA2 Enterprise";
+        default: return "Unknown";
+    }
+}
+
+// Функция для вычисления CRC32
+uint32_t calculateCRC(const uint8_t *data, size_t length) {
+  uint32_t crc = 0xffffffff;
+  while (length--) {
+    crc ^= *data++;
+    for (uint8_t i = 0; i < 8; i++) {
+      crc = (crc >> 1) ^ (0xEDB88320 & -(crc & 1));
+    }
+  }
+  return ~crc;
+}
+
+// Функция для загрузки настроек из LittleFS
+bool loadSettings() {
+  File file = LittleFS.open("/settings.dat", "r");
+  if (!file) {
+    Serial.println("Не удалось открыть файл настроек для чтения");
+    return false;
+  }
+
+  // Читаем данные
+  size_t bytesRead = file.read((uint8_t*)&systemSettings, sizeof(SystemSettings));
+  file.close();
+
+  if (bytesRead != sizeof(SystemSettings)) {
+    Serial.println("Неверный размер файла настроек");
+    return false;
+  }
+
+  // Проверяем CRC
+  uint32_t savedCrc = systemSettings.crc;
+  systemSettings.crc = 0;
+  uint32_t calculatedCrc = calculateCRC((uint8_t*)&systemSettings, sizeof(SystemSettings) - sizeof(uint32_t));
+
+  if (savedCrc != calculatedCrc) {
+    Serial.println("Ошибка CRC в настройках");
+    return false;
+  }
+
+  Serial.println("Настройки успешно загружены");
+  return true;
+}
+
+// Функция для сохранения настроек в LittleFS
+bool saveSettings() {
+  // Рассчитываем CRC перед сохранением
+  systemSettings.crc = 0;
+  systemSettings.crc = calculateCRC((uint8_t*)&systemSettings, sizeof(SystemSettings) - sizeof(uint32_t));
+
+  File file = LittleFS.open("/settings.dat", "w");
+  if (!file) {
+    Serial.println("Не удалось открыть файл настроек для записи");
+    return false;
+  }
+
+  size_t bytesWritten = file.write((uint8_t*)&systemSettings, sizeof(SystemSettings));
+  file.close();
+
+  if (bytesWritten != sizeof(SystemSettings)) {
+    Serial.println("Ошибка записи настроек");
+    return false;
+  }
+
+  Serial.println("Настройки успешно сохранены");
+  return true;
+}
+
+// Функция для установки настроек по умолчанию
+void setDefaultSettings() {
+  // WiFi
+  strlcpy(systemSettings.wifi.mode, "station", sizeof(systemSettings.wifi.mode));
+  strlcpy(systemSettings.wifi.ssid, "", sizeof(systemSettings.wifi.ssid));
+  strlcpy(systemSettings.wifi.password, "", sizeof(systemSettings.wifi.password));
+
+  // Точка доступа
+  strlcpy(systemSettings.ap.ssid, "ESP32-FileServer", sizeof(systemSettings.ap.ssid));
+  strlcpy(systemSettings.ap.password, "admin1234", sizeof(systemSettings.ap.password));
+
+  // USB
+  systemSettings.usb.enabled = true;
+
+  // Порты
+  systemSettings.ports.port1_enabled = false;
+  systemSettings.ports.port2_enabled = false;
+
+  // Сохраняем настройки по умолчанию
+  saveSettings();
+}
+
 void setup() {
   Serial.begin(115200);
   pinMode(PIN_CHARGE, INPUT);
@@ -79,9 +183,11 @@ void setup() {
     return;
   }
 
-  // Запуск WiFi
-  WiFi.begin(ssid, password);
-  Serial.print("Подключение к WiFi");
+  // В функции setup() после инициализации LittleFS добавьте:
+  if (!loadSettings()) {
+    Serial.println("Используются настройки по умолчанию");
+    setDefaultSettings();
+  }
   
   // Подключение к WiFi
   WiFi.begin(ssid, password);
@@ -335,33 +441,159 @@ server.on("/upload", HTTP_POST,
     }
   }
 );
-// Добавим в setup() новые маршруты:
+// Обработчик для получения текущих настроек
 server.on("/api/settings", HTTP_GET, [](AsyncWebServerRequest *request) {
+  // if(!checkAuth(request)) return;
+  
+  DynamicJsonDocument doc(1024);
+  
+  // WiFi settings
+  doc["wifi"]["mode"] = systemSettings.wifi.mode;
+  doc["wifi"]["ssid"] = systemSettings.wifi.ssid;
+  doc["wifi"]["password"] = "********"; // Не возвращаем реальный пароль
+  
+  // AP settings
+  doc["ap"]["ssid"] = systemSettings.ap.ssid;
+  doc["ap"]["password"] = "********"; // Не возвращаем реальный пароль
+  
+  // USB settings
+  doc["usb"]["enabled"] = systemSettings.usb.enabled;
+  
+  // Ports settings
+  doc["ports"]["port1_enabled"] = systemSettings.ports.port1_enabled;
+  doc["ports"]["port2_enabled"] = systemSettings.ports.port2_enabled;
+  
+  String json;
+  serializeJson(doc, json);
+  request->send(200, "application/json", json);
+});
+
+// Обработчик для сохранения настроек WiFi
+server.on("/api/settings/wifi", HTTP_POST, [](AsyncWebServerRequest *request) {
+  // if(!checkAuth(request)) return;
+  
+  if(request->_tempObject == nullptr) {
+    request->send(400, "text/plain", "Bad Request");
+    return;
+  }
+  
+  String body = String((char*)request->_tempObject);
+  DynamicJsonDocument doc(512);
+  deserializeJson(doc, body);
+  
+  // Обновляем WiFi настройки
+  strlcpy(systemSettings.wifi.mode, doc["wifi"]["mode"], sizeof(systemSettings.wifi.mode));
+  strlcpy(systemSettings.wifi.ssid, doc["wifi"]["ssid"], sizeof(systemSettings.wifi.ssid));
+  strlcpy(systemSettings.wifi.password, doc["wifi"]["password"], sizeof(systemSettings.wifi.password));
+  
+  // Обновляем AP настройки
+  strlcpy(systemSettings.ap.ssid, doc["ap"]["ssid"], sizeof(systemSettings.ap.ssid));
+  strlcpy(systemSettings.ap.password, doc["ap"]["password"], sizeof(systemSettings.ap.password));
+  
+  // Сохраняем настройки
+  if (saveSettings()) {
+    request->send(200, "text/plain", "OK");
+  } else {
+    request->send(500, "text/plain", "Failed to save settings");
+  }
+}, NULL, [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+  // Обработчик тела запроса
+  if(!request->_tempObject && index == 0){
+    request->_tempObject = malloc(total + 1);
+    ((uint8_t*)request->_tempObject)[total] = 0;
+  }
+  if(request->_tempObject){
+    memcpy((uint8_t*)request->_tempObject + index, data, len);
+  }
+});
+// Обработчик для сохранения настроек USB
+server.on("/api/settings/usb", HTTP_POST, [](AsyncWebServerRequest *request) {
+  // if(!checkAuth(request)) return;
+  
+  if(request->_tempObject == nullptr) {
+    request->send(400, "text/plain", "Bad Request");
+    return;
+  }
+  
+  String body = String((char*)request->_tempObject);
+  DynamicJsonDocument doc(128);
+  deserializeJson(doc, body);
+  
+  systemSettings.usb.enabled = doc["enabled"];
+  
+  if (saveSettings()) {
+    request->send(200, "text/plain", "OK");
+  } else {
+    request->send(500, "text/plain", "Failed to save settings");
+  }
+}, NULL, [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+  // Аналогичный обработчик тела запроса
+});
+
+// Обработчик для сохранения настроек портов
+server.on("/api/settings/ports", HTTP_POST, [](AsyncWebServerRequest *request) {
+  // if(!checkAuth(request)) return;
+  
+  if(request->_tempObject == nullptr) {
+    request->send(400, "text/plain", "Bad Request");
+    return;
+  }
+  
+  String body = String((char*)request->_tempObject);
+  DynamicJsonDocument doc(128);
+  deserializeJson(doc, body);
+  
+  systemSettings.ports.port1_enabled = doc["port1_enabled"];
+  systemSettings.ports.port2_enabled = doc["port2_enabled"];
+  
+  if (saveSettings()) {
+    request->send(200, "text/plain", "OK");
+  } else {
+    request->send(500, "text/plain", "Failed to save settings");
+  }
+}, NULL, [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+  // Аналогичный обработчик тела запроса
+});
+
+// Обработчик для сброса настроек
+server.on("/api/system/reset", HTTP_POST, [](AsyncWebServerRequest *request) {
+  // if(!checkAuth(request)) return;
+  
+  setDefaultSettings();
+  
+  request->send(200, "text/plain", "Settings reset to default. Rebooting...");
+  delay(1000);
+  ESP.restart();
+});
+
+server.on("/api/system/reboot", HTTP_POST, [](AsyncWebServerRequest *request) {
+    // if(!checkAuth(request)) return;
+    
+    request->send(200, "text/plain", "Rebooting...");
+    delay(1000);
+    ESP.restart();
+});
+
+server.on("/api/wifi/scan", HTTP_GET, [](AsyncWebServerRequest *request) {
     // if(!checkAuth(request)) return;
     
     DynamicJsonDocument doc(1024);
-    
-    // WiFi settings
-    doc["wifi"]["mode"] = WiFi.getMode() == WIFI_STA ? "station" : "ap";
-    doc["wifi"]["ssid"] = WiFi.SSID();
-    doc["wifi"]["password"] = "********"; // Не возвращаем реальный пароль
-    
-    // AP settings
-    doc["ap"]["ssid"] = "ESP32-AP"; // Ваше имя AP
-    doc["ap"]["password"] = "********"; // Не возвращаем реальный пароль
-    
-    // USB settings
-    // doc["usb"]["enabled"] = MSC.mediaPresent();
-    
-    // Ports settings (пример)
-    // doc["ports"]["port1"] = digitalRead(PIN_EXT_PORT1) == HIGH;
-    // doc["ports"]["port2"] = digitalRead(PIN_EXT_PORT2) == HIGH;
+    JsonArray networks = doc.to<JsonArray>();
+    Serial.println("Сканирование WIFI");
+    // Пример сканирования WiFi сетей
+    int n = WiFi.scanNetworks();
+    for(int i = 0; i < n; i++) {
+        JsonObject network = networks.createNestedObject();
+        network["ssid"] = WiFi.SSID(i);
+        network["rssi"] = WiFi.RSSI(i);
+        network["channel"] = WiFi.channel(i);
+        network["encryption"] = encryptionTypeToString(WiFi.encryptionType(i));
+    }
     
     String json;
     serializeJson(doc, json);
     request->send(200, "application/json", json);
 });
-
   server.on("/settings.html", HTTP_GET, [](AsyncWebServerRequest *request){
     // if(checkAuth(request)) {
     request->send(LittleFS, "/settings.html", "text/html");

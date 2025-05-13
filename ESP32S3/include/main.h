@@ -57,3 +57,36 @@ static uint32_t sectors = 0;
 uint16_t batteryLevel;
 bool isCharging;
 volatile bool isDownloading = false; // Флаг скачивания
+
+// Структура для хранения настроек WiFi
+typedef struct {
+  char mode[8];          // "station" или "ap"
+  char ssid[32];         // SSID сети
+  char password[64];     // Пароль сети
+} WiFiSettings;
+
+// Структура для хранения настроек точки доступа
+typedef struct {
+  char ssid[32];         // Имя точки доступа
+  char password[64];     // Пароль точки доступа
+} APSettings;
+
+// Структура для хранения настроек USB
+typedef struct {
+  bool enabled;          // Включен ли USB Mass Storage
+} USBSettings;
+
+// Структура для хранения настроек портов
+typedef struct {
+  bool port1_enabled;    // Включен ли порт 1
+  bool port2_enabled;    // Включен ли порт 2
+} PortsSettings;
+
+// Основная структура всех настроек
+typedef struct {
+  WiFiSettings wifi;
+  APSettings ap;
+  USBSettings usb;
+  PortsSettings ports;
+  uint32_t crc;          // Контрольная сумма для проверки целостности
+} SystemSettings;

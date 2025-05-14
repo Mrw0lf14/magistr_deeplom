@@ -28,6 +28,7 @@ static bool onStartStop(uint8_t power_condition, bool start, bool load_eject);
 
 #define PIN_VBAT        4
 #define PIN_CHARGE      5
+#define PIN_BUTTON      7
 
 //oled display
 #define PIN_SDA         17

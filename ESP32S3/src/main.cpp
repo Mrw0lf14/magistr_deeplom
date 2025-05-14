@@ -16,6 +16,10 @@ uint16_t batteryLevel;
 bool isCharging;
 bool isDownloading;                         // Флаг скачивания
 bool isCardMounted = true;
+volatile bool buttonPressed = false;  // Флаг нажатия кнопки
+bool showDisplay = true;
+unsigned long lastDebounceTime = 0;   // Время последнего нажатия
+const unsigned long debounceDelay = 200; // Задержка для антидребезга
 // Глобальные счетчики
 static uint32_t readCounter = 0, writeCounter = 0, busyCounter = 0;
 
@@ -183,10 +187,25 @@ void setDefaultSettings() {
   saveSettings();
 }
 
+void IRAM_ATTR handleButtonInterrupt() {
+  static unsigned long lastInterruptTime = 0;
+  unsigned long interruptTime = millis();
+  
+  // Антидребезг - игнорируем нажатия чаще чем debounceDelay
+  if (interruptTime - lastInterruptTime > debounceDelay) {
+    buttonPressed = true;
+    Serial.println("but");
+    showDisplay = !showDisplay;
+  }
+  lastInterruptTime = interruptTime;
+}
+
 void setup() {
   Serial.begin(115200);
   pinMode(PIN_CHARGE, INPUT);
-
+  // Настройка кнопки
+  pinMode(PIN_BUTTON, INPUT_PULLUP); // Кнопка подключена к GND
+  attachInterrupt(digitalPinToInterrupt(PIN_BUTTON), handleButtonInterrupt, FALLING);
   // Инициализация дисплея
   Wire.begin(PIN_SDA, PIN_SCL);
   if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
@@ -319,10 +338,13 @@ void updateBatteryDisplay() {
 void loop() {
   static unsigned long lastCheck = 0;
   if (millis() - lastCheck >= 10000) { // Раз в 10 секунд
-    display.clearDisplay();
-    updateBatteryDisplay();
-    updateStatusDisplay();
-    display.display();
+    if (showDisplay)
+    {
+      display.clearDisplay();
+      updateBatteryDisplay();
+      updateStatusDisplay();
+      display.display();
+    }
     lastCheck = millis();
   }
 }

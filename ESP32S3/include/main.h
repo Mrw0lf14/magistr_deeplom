@@ -15,7 +15,14 @@
 #include "SdFat.h"
 #include "USB.h"
 #include "USBMSC.h"
+#include "handlers.h"
 
+bool loadSettings();
+bool saveSettings();
+void setDefaultSettings();
+static int32_t onWrite(uint32_t lba, uint32_t offset, uint8_t *buffer, uint32_t bufsize);
+static int32_t onRead(uint32_t lba, uint32_t offset, void *buffer, uint32_t bufsize);
+static bool onStartStop(uint8_t power_condition, bool start, bool load_eject);
 #define min(X, Y) (((X) < (Y)) ? (X) : (Y))
 
 #define PIN_VBAT        4
@@ -80,14 +87,6 @@ const uint8_t usb_on[] PROGMEM = {
   0x00,0x00,0xff,0xff,0x80,0x01,0xbf,0xfd,0xa0,0x05,0xa0,0x05,0xa0,0x05,0xa0,0x05,0xa0,0x05,0xbf,
   0xfd,0x80,0x01,0xff,0xff,0x03,0xc0,0x03,0xc0,0x0f,0xf0,0x00,0x00
 };
-// Настройки USB MSC
-SdFat sd;
-USBMSC MSC;
-static const uint16_t DISK_SECTOR_SIZE = 512;
-static uint32_t sectors = 0;
-uint16_t batteryLevel;
-bool isCharging;
-volatile bool isDownloading = false; // Флаг скачивания
 
 // Структура для хранения настроек WiFi
 typedef struct {
@@ -121,3 +120,25 @@ typedef struct {
   PortsSettings ports;
   uint32_t crc;          // Контрольная сумма для проверки целостности
 } SystemSettings;
+
+
+extern AsyncWebServer server;
+
+extern Adafruit_SSD1306 display;
+
+// Глобальная переменная для хранения настроек
+extern SystemSettings systemSettings;
+
+// Данные для авторизации
+extern const char* auth_username;
+extern const char* auth_password;
+extern const char* ssid;     // Замените на имя вашей WiFi сети
+extern const char* password;       // Замените на пароль
+
+extern SdFat sd;
+extern USBMSC MSC;
+extern uint16_t DISK_SECTOR_SIZE;
+extern uint32_t sectors;
+extern uint16_t batteryLevel;
+extern bool isCharging;
+extern bool isDownloading; // Флаг скачивания

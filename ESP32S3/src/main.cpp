@@ -15,6 +15,7 @@ const char* password = "listentome";        // Замените на парол�
 uint16_t batteryLevel;
 bool isCharging;
 bool isDownloading;                         // Флаг скачивания
+bool isCardMounted = true;
 // Глобальные счетчики
 static uint32_t readCounter = 0, writeCounter = 0, busyCounter = 0;
 
@@ -33,6 +34,53 @@ static int32_t onRead(uint32_t lba, uint32_t offset, void *buffer, uint32_t bufs
 
 static bool onStartStop(uint8_t power_condition, bool start, bool load_eject) {
   return true;
+}
+
+void setupAPMode() {
+    // Отключаем WiFi (если был подключен)
+    WiFi.disconnect();
+    
+    // Переключаем в режим точки доступа
+    WiFi.mode(WIFI_AP);
+    
+    // Настраиваем точку доступа
+    WiFi.softAP(systemSettings.ap.ssid, systemSettings.ap.password);
+    
+    Serial.print("Точка доступа запущена. SSID: ");
+    Serial.println(systemSettings.ap.ssid);
+    Serial.print("IP адрес: ");
+    Serial.println(WiFi.softAPIP());
+    Serial.print("Пароль: ");
+    Serial.println(systemSettings.ap.password);
+}
+
+void setupNetwork() {
+    if (strcmp(systemSettings.wifi.mode, "ap") == 0) {
+        // Режим точки доступа
+        setupAPMode();
+    } else {
+        // Режим клиента (подключение к WiFi)
+        WiFi.begin(systemSettings.wifi.ssid, systemSettings.wifi.password);
+        Serial.print("Подключение к WiFi");
+        
+        int attempts = 0;
+        while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+            delay(500);
+            Serial.print(".");
+            attempts++;
+        }
+        
+        if (WiFi.status() == WL_CONNECTED) {
+            Serial.println("\nПодключено!");
+            Serial.print("IP адрес: ");
+            Serial.println(WiFi.localIP());
+        } else {
+            Serial.println("\nНе удалось подключиться к WiFi. Переключаемся в режим точки доступа");
+            strcpy(systemSettings.wifi.mode, "ap");
+            saveSettings();
+            setupAPMode();
+        }
+    }
 }
 
 void listFiles() {
@@ -143,7 +191,6 @@ void setup() {
   Wire.begin(PIN_SDA, PIN_SCL);
   if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
     Serial.println(F("SSD1306 allocation failed"));
-    for(;;);
   }
   display.clearDisplay();
   display.setTextColor(SSD1306_WHITE);
@@ -166,18 +213,7 @@ void setup() {
     setDefaultSettings();
   }
   
-  // Подключение к WiFi
-  WiFi.begin(ssid, password);
-  Serial.print("Подключение к WiFi");
-  
-  while(WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  
-  Serial.println("\nПодключено!");
-  Serial.print("IP адрес: ");
-  Serial.println(WiFi.localIP());
+  setupNetwork();
 
   // Маршруты
   server.on("/", HTTP_GET, handleRoot);
@@ -211,7 +247,9 @@ void setup() {
 
   if (!SD.begin(CS_PIN, SPI, 40000000)) {
         Serial.println("Ошибка инициализации SD карты");
+        display.setCursor(0, 17);
         display.println("SD Card Error");
+        isCardMounted = false;
         display.display();
         return;
     }
@@ -227,38 +265,64 @@ void setup() {
 
 }
 
+void updateStatusDisplay()
+{
+  if (strcmp(systemSettings.wifi.mode, "station"))
+  {
+    display.drawBitmap(0, 0, wifi_ap, 15, 16, 1);
+    display.setCursor(0, 20);
+    display.print("SSID:");
+    display.println(systemSettings.ap.ssid);
+    display.setCursor(0, 40);
+    display.print("IP  :");
+    display.println(WiFi.softAPIP());
+  }
+  else
+  {
+    if (WiFi.status() == WL_CONNECTED)
+    {
+      display.drawBitmap(0, 0, wifi_sta_con, 19, 16, 1);
+      display.setCursor(0, 20);
+      display.print("SSID:");
+      display.println(systemSettings.wifi.ssid);
+      display.setCursor(0, 40);
+      display.print("IP  :");
+      display.println(WiFi.localIP());
+    }
+      
+    else
+      display.drawBitmap(0, 0, wifi_sta_discon, 19, 16, 1);
+  }
+  if (isCardMounted)
+    display.drawBitmap(20, 0, sd_on, 14, 16, 1);
+  else
+    display.drawBitmap(20, 0, sd_off, 14, 16, 1);
+  if (systemSettings.usb.enabled)
+    display.drawBitmap(35, 0, usb_on, 16, 16, 1);
+}
 void updateBatteryDisplay() {
   uint16_t volt_bat = analogRead(PIN_VBAT);
   uint8_t state_charge = digitalRead(PIN_CHARGE);
-  display.clearDisplay();
   
   batteryLevel = (volt_bat - 3000) * 100 / 450;
   batteryLevel = batteryLevel > 100? 100: batteryLevel;
   isCharging = state_charge == 1 ? true : false;
-  // Очищаем только область батареи
-  display.fillRect(90, 0, 40, 16, SSD1306_BLACK);
-  
-  // Рисуем иконки
-  // Serial.println(volt_bat);
-  display.drawBitmap(0, 0, wifi_ap, 15, 16, 1);
-  display.drawBitmap(16, 0, wifi_sta_con, 19, 16, 1);
-  display.drawBitmap(36, 0, wifi_sta_discon, 19, 16, 1);
-  display.drawBitmap(55, 0, sd_on, 14, 16, 1);
-  display.drawBitmap(70, 0, sd_off, 14, 16, 1);
-  display.drawBitmap(70, 17, usb_on, 16, 16, 1);
+
   display.drawBitmap(90, 0, charge_bmp, 8, 16, (state_charge == 1));
   display.drawBitmap(100, 0, bat_body_bpm, 24, 16, SSD1306_WHITE);
   display.drawBitmap(103, 0, bat_cell_bpm, 8, 16, (volt_bat > 3000));
   display.drawBitmap(108, 0, bat_cell_bpm, 8, 16, (volt_bat > 3100));
   display.drawBitmap(113, 0, bat_cell_bpm, 8, 16, (volt_bat > 3200));
   display.drawBitmap(118, 0, bat_cell_bpm, 8, 16, (volt_bat > 3300));
-  display.display();
 }
 
 void loop() {
   static unsigned long lastCheck = 0;
   if (millis() - lastCheck >= 10000) { // Раз в 10 секунд
-      updateBatteryDisplay();
-      lastCheck = millis();
+    display.clearDisplay();
+    updateBatteryDisplay();
+    updateStatusDisplay();
+    display.display();
+    lastCheck = millis();
   }
 }

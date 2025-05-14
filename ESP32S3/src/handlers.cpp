@@ -290,6 +290,7 @@ void handleSaveWiFiSettings(AsyncWebServerRequest *request) {
     // Сохраняем настройки
     if (saveSettings()) {
     Serial.println("Настройки сохранены");
+    setupNetwork();
     request->send(200, "text/plain", "OK");
     } else {
     request->send(500, "text/plain", "Failed to save settings");

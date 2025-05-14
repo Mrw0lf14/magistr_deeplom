@@ -20,6 +20,7 @@
 bool loadSettings();
 bool saveSettings();
 void setDefaultSettings();
+void setupNetwork();
 static int32_t onWrite(uint32_t lba, uint32_t offset, uint8_t *buffer, uint32_t bufsize);
 static int32_t onRead(uint32_t lba, uint32_t offset, void *buffer, uint32_t bufsize);
 static bool onStartStop(uint8_t power_condition, bool start, bool load_eject);

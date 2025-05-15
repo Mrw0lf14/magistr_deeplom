@@ -4,6 +4,8 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 AsyncWebServer server(80);
 
+SdFat sd;
+USBMSC MSC;
 // Глобальная переменная для хранения настроек
 SystemSettings systemSettings;
 
@@ -22,6 +24,12 @@ unsigned long lastDebounceTime = 0;   // Время последнего наж�
 const unsigned long debounceDelay = 200; // Задержка для антидребезга
 // Глобальные счетчики
 static uint32_t readCounter = 0, writeCounter = 0, busyCounter = 0;
+// Глобальные переменные для USB MSC
+bool usbActive = false;
+bool usbEnabled = false;
+
+static const uint16_t DISK_SECTOR_SIZE = 512;    // Should be 512
+uint32_t sectors = 0;
 
 // Callbacks для USB MSC
 static int32_t onWrite(uint32_t lba, uint32_t offset, uint8_t *buffer, uint32_t bufsize) {
@@ -38,6 +46,50 @@ static int32_t onRead(uint32_t lba, uint32_t offset, void *buffer, uint32_t bufs
 
 static bool onStartStop(uint8_t power_condition, bool start, bool load_eject) {
   return true;
+}
+
+void initUSB_MSC() {
+    if(usbActive) return;
+    
+    // Отключаем SD карту перед активацией USB
+    SD.end();
+    
+    // Инициализация USB MSC
+    MSC.onStartStop(onStartStop);
+    MSC.onRead(onRead);
+    MSC.onWrite(onWrite);
+    
+    // Получаем количество секторов SD карты
+    if(!sd.begin(CS_PIN)) {
+        Serial.println("Ошибка инициализации SD для USB MSC");
+        return;
+    }
+    sectors = sd.card()->sectorCount();
+    
+    MSC.mediaPresent(true);
+    MSC.begin(sectors, DISK_SECTOR_SIZE);
+    USB.begin();
+    
+    usbActive = true;
+    Serial.println("USB MSC включен");
+}
+
+void deinitUSB_MSC() {
+    if(!usbActive) return;
+    
+    // Отключаем USB
+    MSC.end();
+    // USB.end();
+    
+    // Переинициализируем SD карту для SPI доступа
+    SD.begin(CS_PIN, SPI, 40000000);
+    
+    usbActive = false;
+    Serial.println("USB MSC выключен");
+}
+
+bool isUSB_MSC_Active() {
+    return usbActive;
 }
 
 void setupAPMode() {
@@ -281,6 +333,17 @@ void setup() {
   }
   testFile.close();
   Serial.printf("SD write speed: %.2f KB/s\n", 50.0 / ((millis() - start) / 1000.0));
+
+  // Инициализация USB в соответствии с настройками
+  if(systemSettings.usb.enabled) {
+      initUSB_MSC();
+  } else {
+    // Инициализируем SD карту для SPI доступа
+    if(!SD.begin(CS_PIN, SPI, 40000000)) {
+        Serial.println("Ошибка инициализации SD карты");
+        isCardMounted = false;
+    }
+  }
 
 }
 

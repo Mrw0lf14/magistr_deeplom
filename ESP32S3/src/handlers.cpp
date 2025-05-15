@@ -92,6 +92,10 @@ void handleBattery(AsyncWebServerRequest *request) {
 
 void handleFileList(AsyncWebServerRequest *request) {
     Serial.println("Запрос списка файлов с SD карты");
+    if(isUSB_MSC_Active()) {
+        request->send(503, "text/plain", "SD карта недоступна (активен USB режим)");
+        return;
+    }
     if (isDownloading) return;
 
     String path = "/";
@@ -306,6 +310,13 @@ void handleSaveUSBSettings(AsyncWebServerRequest *request) {
     deserializeJson(doc, body);
 
     systemSettings.usb.enabled = doc["enabled"];
+
+    // Применяем изменения немедленно
+    if(usbEnabled) {
+        initUSB_MSC();
+    } else {
+        deinitUSB_MSC();
+    }
 
     if (saveSettings()) {
     request->send(200, "text/plain", "OK");

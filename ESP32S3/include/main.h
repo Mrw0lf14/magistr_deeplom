@@ -21,6 +21,13 @@ bool loadSettings();
 bool saveSettings();
 void setDefaultSettings();
 void setupNetwork();
+void initUSB_MSC();
+void deinitUSB_MSC();
+bool isUSB_MSC_Active();
+void initUSB_MSC();
+void deinitUSB_MSC();
+bool isUSB_MSC_Active();
+
 static int32_t onWrite(uint32_t lba, uint32_t offset, uint8_t *buffer, uint32_t bufsize);
 static int32_t onRead(uint32_t lba, uint32_t offset, void *buffer, uint32_t bufsize);
 static bool onStartStop(uint8_t power_condition, bool start, bool load_eject);
@@ -139,8 +146,10 @@ extern const char* password;       // Замените на пароль
 
 extern SdFat sd;
 extern USBMSC MSC;
-extern uint16_t DISK_SECTOR_SIZE;
+// extern uint16_t DISK_SECTOR_SIZE;
 extern uint32_t sectors;
 extern uint16_t batteryLevel;
 extern bool isCharging;
 extern bool isDownloading; // Флаг скачивания
+extern bool usbActive;
+extern bool usbEnabled;

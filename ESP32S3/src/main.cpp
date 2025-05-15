@@ -81,8 +81,14 @@ void deinitUSB_MSC() {
     MSC.end();
     // USB.end();
     
-    // Переинициализируем SD карту для SPI доступа
-    SD.begin(CS_PIN, SPI, 40000000);
+    if (!SD.begin(CS_PIN, SPI, 40000000)) {
+      Serial.println("Ошибка инициализации SD карты");
+      display.setCursor(0, 17);
+      display.println("SD Card Error");
+      isCardMounted = false;
+      display.display();
+      return;
+    }
     
     usbActive = false;
     Serial.println("USB MSC выключен");
@@ -317,13 +323,13 @@ void setup() {
   SPI.begin(SCK_PIN, MISO_PIN, MOSI_PIN);
 
   if (!SD.begin(CS_PIN, SPI, 40000000)) {
-        Serial.println("Ошибка инициализации SD карты");
-        display.setCursor(0, 17);
-        display.println("SD Card Error");
-        isCardMounted = false;
-        display.display();
-        return;
-    }
+    Serial.println("Ошибка инициализации SD карты");
+    display.setCursor(0, 17);
+    display.println("SD Card Error");
+    isCardMounted = false;
+    display.display();
+    return;
+  }
   Serial.println("SD карта инициализирована");
   File testFile = SD.open("/speedtest.bin", FILE_WRITE);
   uint8_t buf[512] = {0};

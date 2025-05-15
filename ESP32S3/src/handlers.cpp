@@ -312,7 +312,7 @@ void handleSaveUSBSettings(AsyncWebServerRequest *request) {
     systemSettings.usb.enabled = doc["enabled"];
 
     // Применяем изменения немедленно
-    if(usbEnabled) {
+    if(systemSettings.usb.enabled) {
         initUSB_MSC();
     } else {
         deinitUSB_MSC();

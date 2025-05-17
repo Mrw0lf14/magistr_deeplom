@@ -199,6 +199,64 @@ bool loadSettings() {
   return true;
 }
 
+const int TEST_ITERATIONS = 100;
+const int BUF_SIZE = 512;       // 512 байт
+const int WRITE_ITERATIONS = 100; // 100 итераций × 512B = 51,200B ≈ 50KB
+const String TEST_FILE = "/speedtest.bin";
+
+void testWriteSpeed() {
+  uint8_t buf[BUF_SIZE] = {0};
+  
+  Serial.println("Test#,Type,Speed_KB/s");
+  
+  for (int test = 1; test <= TEST_ITERATIONS; test++) {
+    File file = SD.open(TEST_FILE, FILE_WRITE);
+    uint32_t start = micros(); // Используем micros() для большей точности
+    
+    for (int i = 0; i < WRITE_ITERATIONS; i++) {
+      file.write(buf, BUF_SIZE);
+    }
+    
+    uint32_t duration = micros() - start;
+    file.close();
+    
+    float speed = (50.0 / (duration / 1000000.0)); // 50KB/(секунды)
+    Serial.printf("%d,W,%.0f\n", test, speed);
+    
+    SD.remove(TEST_FILE);
+    delay(50); // Пауза между тестами
+  }
+}
+
+void testReadSpeed() {
+  uint8_t buf[BUF_SIZE];
+  
+  // Подготовка тестового файла (50KB)
+  File writeFile = SD.open(TEST_FILE, FILE_WRITE);
+  for (int i = 0; i < WRITE_ITERATIONS; i++) {
+    writeFile.write(buf, BUF_SIZE);
+  }
+  writeFile.close();
+
+  for (int test = 1; test <= TEST_ITERATIONS; test++) {
+    File file = SD.open(TEST_FILE, FILE_READ);
+    uint32_t start = micros();
+    
+    while (file.available()) {
+      file.read(buf, BUF_SIZE);
+    }
+    
+    uint32_t duration = micros() - start;
+    float speed = (50.0 / (duration / 1000000.0));
+    Serial.printf("%d,R,%.0f\n", test, speed);
+    
+    file.close();
+    delay(50);
+  }
+
+  SD.remove(TEST_FILE);
+}
+
 // Функция для сохранения настроек в LittleFS
 bool saveSettings() {
   // Рассчитываем CRC перед сохранением
@@ -331,15 +389,16 @@ void setup() {
     return;
   }
   Serial.println("SD карта инициализирована");
-  File testFile = SD.open("/speedtest.bin", FILE_WRITE);
-  uint8_t buf[512] = {0};
-  uint32_t start = millis();
-  for (int i = 0; i < 100; i++) {
-      testFile.write(buf, sizeof(buf));
-  }
-  testFile.close();
-  Serial.printf("SD write speed: %.2f KB/s\n", 50.0 / ((millis() - start) / 1000.0));
-
+  // File testFile = SD.open("/speedtest.bin", FILE_WRITE);
+  // uint8_t buf[512] = {0};
+  // uint32_t start = millis();
+  // for (int i = 0; i < 100; i++) {
+  //     testFile.write(buf, sizeof(buf));
+  // }
+  // testFile.close();
+  // Serial.printf("SD write speed: %.2f KB/s\n", 50.0 / ((millis() - start) / 1000.0));
+  testWriteSpeed();
+  testReadSpeed();
   // Инициализация USB в соответствии с настройками
   if(systemSettings.usb.enabled) {
       initUSB_MSC();

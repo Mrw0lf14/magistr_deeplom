@@ -1,4 +1,5 @@
 #include "main.h"
+#include "esp_sleep.h"
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
@@ -22,6 +23,9 @@ volatile bool buttonPressed = false;  // Флаг нажатия кнопки
 bool showDisplay = true;
 unsigned long lastDebounceTime = 0;   // Время последнего нажатия
 const unsigned long debounceDelay = 200; // Задержка для антидребезга
+const unsigned long longPressDelay = 2000; // 2 секунды для длительного нажатия
+unsigned long buttonPressStartTime = 0;
+bool longPressActive = false;
 // Глобальные счетчики
 static uint32_t readCounter = 0, writeCounter = 0, busyCounter = 0;
 // Глобальные переменные для USB MSC
@@ -254,6 +258,7 @@ void IRAM_ATTR handleButtonInterrupt() {
     buttonPressed = true;
     Serial.println("but");
     showDisplay = !showDisplay;
+    display.clearDisplay();
   }
   lastInterruptTime = interruptTime;
 }
@@ -406,9 +411,72 @@ void updateBatteryDisplay() {
 
 void loop() {
   static unsigned long lastCheck = 0;
-  if (millis() - lastCheck >= 10000) { // Раз в 10 секунд
-    if (showDisplay)
-    {
+  static unsigned long lastDisplayUpdate = 0;
+  
+  // Обработка нажатия кнопки
+  if (buttonPressed) {
+    buttonPressed = false;
+    buttonPressStartTime = millis();
+  }
+  
+  // Проверяем длительное нажатие
+  if (buttonPressStartTime > 0) {
+    if (digitalRead(PIN_BUTTON) == LOW) { // Кнопка все еще нажата
+      if (millis() - buttonPressStartTime >= longPressDelay && !longPressActive) {
+        longPressActive = true;
+        // Действия при длительном нажатии
+        display.clearDisplay();
+        display.setCursor(0, 0);
+        display.println("Go to sleep...");
+        display.display();
+        
+        // Сохраняем настройки
+        saveSettings();
+        
+        // Задержка для отображения сообщения
+        delay(1000);
+        
+        // Выключаем дисплей
+        display.clearDisplay();
+        display.display();
+        showDisplay = false;
+        
+        // Вместо комментария "// Здесь можно добавить переход в глубокий сон"
+        display.ssd1306_command(SSD1306_DISPLAYOFF); // Полностью выключаем дисплей
+
+        // Настраиваем кнопку как источник пробуждения
+        esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_BUTTON, LOW);
+
+        // Отключаем периферию перед сном
+        WiFi.disconnect(true);
+        WiFi.mode(WIFI_OFF);
+        btStop();
+
+        // Переходим в глубокий сон
+        esp_deep_sleep_start();
+      }
+    } else { // Кнопка отпущена
+      buttonPressStartTime = 0;
+      if (!longPressActive) {
+        // Короткое нажатие - переключение дисплея
+        showDisplay = !showDisplay;
+        if (showDisplay) {
+          display.clearDisplay();
+          updateBatteryDisplay();
+          updateStatusDisplay();
+          display.display();
+        } else {
+          display.clearDisplay();
+          display.display();
+        }
+      }
+      longPressActive = false;
+    }
+  }
+  
+  // Обновление статуса каждые 5 секунд
+  if (millis() - lastCheck >= 5000) {
+    if (showDisplay) {
       display.clearDisplay();
       updateBatteryDisplay();
       updateStatusDisplay();
@@ -416,4 +484,6 @@ void loop() {
     }
     lastCheck = millis();
   }
+  
+  // Другие операции...
 }
